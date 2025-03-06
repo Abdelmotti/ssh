@@ -1,27 +1,61 @@
-document.addEventListener("DOMContentLoaded", function () {
-    if (window.location.pathname.includes("dashboard.html")) {
-        caricaDati();
-    }
-});
+// Inizializza Firebase (devi inserire la tua configurazione in firebase-config.js)
+import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
+import { getDatabase, ref, set, get } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
 
-function login() {
-    let username = document.getElementById("username").value;
+const auth = getAuth();
+const db = getDatabase();
+
+// REGISTRAZIONE UTENTE
+function register() {
+    let email = document.getElementById("email").value;
     let password = document.getElementById("password").value;
+    let username = document.getElementById("username").value;
 
-    // Recupero dati da Firebase (simulazione, da collegare con Firebase)
-    let utenti = {
-        "mario": { password: "1234", id: "utente_1" },
-        "luca": { password: "abcd", id: "utente_2" }
-    };
-
-    if (utenti[username] && utenti[username].password === password) {
-        localStorage.setItem("userId", utenti[username].id);
-        window.location.href = "dashboard.html";
-    } else {
-        document.getElementById("error-msg").innerText = "Credenziali errate!";
+    if (email === "" || password === "" || username === "") {
+        document.getElementById("register-msg").innerText = "Compila tutti i campi!";
+        return;
     }
+
+    createUserWithEmailAndPassword(auth, email, password)
+        .then((userCredential) => {
+            let userId = userCredential.user.uid;
+
+            // Salviamo l'utente nel database
+            set(ref(db, 'utenti/' + userId), {
+                username: username,
+                email: email,
+                NO2_ppb: 0,
+                ventola: "OFF",
+                led: "SPENTO",
+                oled: "Benvenuto!"
+            });
+
+            document.getElementById("register-msg").innerText = "Registrazione riuscita!";
+            setTimeout(() => {
+                window.location.href = "index.html";
+            }, 2000);
+        })
+        .catch((error) => {
+            document.getElementById("register-msg").innerText = error.message;
+        });
 }
 
+// LOGIN UTENTE
+function login() {
+    let email = document.getElementById("username").value;
+    let password = document.getElementById("password").value;
+
+    signInWithEmailAndPassword(auth, email, password)
+        .then((userCredential) => {
+            localStorage.setItem("userId", userCredential.user.uid);
+            window.location.href = "dashboard.html";
+        })
+        .catch((error) => {
+            document.getElementById("error-msg").innerText = "Credenziali errate!";
+        });
+}
+
+// CARICA DATI SULLA DASHBOARD
 function caricaDati() {
     let userId = localStorage.getItem("userId");
 
@@ -30,21 +64,20 @@ function caricaDati() {
         return;
     }
 
-    // Simulazione dati, da collegare con Firebase
-    let dati = {
-        "utente_1": { NO2_ppb: 15.3, ventola: "ON", led: "ROSSO", oled: "Attenzione: NO2 alto!" },
-        "utente_2": { NO2_ppb: 5.8, ventola: "OFF", led: "VERDE", oled: "Qualità dell'aria buona." }
-    };
-
-    let info = dati[userId];
-    document.getElementById("no2-value").innerText = info.NO2_ppb;
-    document.getElementById("ventola-state").innerText = info.ventola;
-    document.getElementById("led-state").innerText = info.led;
-    document.getElementById("oled-msg").innerText = info.oled;
+    const userRef = ref(db, 'utenti/' + userId);
+    get(userRef).then((snapshot) => {
+        if (snapshot.exists()) {
+            let dati = snapshot.val();
+            document.getElementById("no2-value").innerText = dati.NO2_ppb;
+            document.getElementById("ventola-state").innerText = dati.ventola;
+            document.getElementById("led-state").innerText = dati.led;
+            document.getElementById("oled-msg").innerText = dati.oled;
+        }
+    });
 }
 
+// LOGOUT
 function logout() {
     localStorage.removeItem("userId");
     window.location.href = "index.html";
 }
-
